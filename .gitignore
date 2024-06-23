@@ -1,0 +1,4 @@
+.venv/
+.stash/
+*.code-workspace
+**/__pycache__/
