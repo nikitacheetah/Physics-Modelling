@@ -1,0 +1,301 @@
+import matplotlib.pyplot as plt
+import matplotlib.animation as anim
+import numpy as np
+import time
+from random import randint
+
+
+# class Node:
+#     def __init__(self, isLeaf, xmin, ymin, xmax, ymax, N, r, m):
+#         self.isLeaf = isLeaf
+#         self.xmin = xmin
+#         self.ymin = ymin
+#         self.xmax = xmax
+#         self.ymax = ymax
+#         self.side = max(self.xmax, self.ymax) - min(self.xmin, self.ymin)
+#         self.cent_r = np.array([(self.xmin+self.xmax)/2, (self.ymin+self.ymax)/2])
+#         self.n = N
+#         self.r = r
+#         self.m = m
+#         self.M = sum(self.m)
+#         self.r_cm = np.dot(self.m, self.r)/self.M
+#         self.params = [self.side, self.cent_r, self.r_cm, self.M, self.n]
+
+#         self.topLeft = None
+#         self.topRight = None
+#         self.bottomLeft = None
+#         self.bottomRight = None
+
+#         if self.isLeaf == False:
+#             self.topLeft = Node(False, self.xmin, (self.ymin+self.ymax)/2, (self.xmin+self.xmax)/2, self.ymax, 0, np.array([]), np.array([]))
+#             self.topRight = Node(False, (self.xmin+self.xmax)/2, (self.ymin+self.ymax)/2, self.xmax, self.ymax, 0, np.array([]), np.array([]))
+#             self.bottomLeft = Node(False, self.xmin, self.ymin, (self.xmin+self.xmax)/2, (self.ymin+self.ymax)/2, 0, np.array([]), np.array([]))
+#             self.bottomRight = Node(False, (self.xmin+self.xmax)/2, self.ymin, self.xmax, (self.ymin+self.ymax)/2, 0, np.array([]), np.array([]))
+ 
+#             for coord in range(N):
+#                 if self.r[coord][0] >= self.topLeft.xmin and self.r[coord][1] > self.topLeft.ymin and self.r[coord][1] <= self.topLeft.ymax and self.r[coord][0] < self.topLeft.xmax:
+#                     self.topLeft.n += 1
+#                     self.topLeft.r = np.append(self.topLeft.r, self.r[coord])
+#                     self.topLeft.m = np.append(self.topLeft.m, self.m[coord])
+# 		        elif self.r[coord][0] >= self.topRight.xmin and self.r[coord][1] > self.topRight.ymin and self.r[coord][1] <= self.topRight.ymax and self.r[coord][0] < self.topRight.xmax:
+#                     self.topRight.n += 1
+#                     self.topRight.r = np.append(self.topRight.r, self.r[coord])
+#                     self.topRight.m = np.append(self.topRight.m, self.m[coord])
+# 		        elif self.r[coord][0] >= self.bottomLeft.xmin and self.r[coord][1] > self.bottomLeft.ymin and self.r[coord][1] <= self.bottomLeft.ymax and self.r[coord][0] < self.bottomLeft.xmax:
+#                     self.bottomLeft.n += 1
+#                     self.bottomLeft.r = np.append(self.bottomLeft.r, self.r[coord])
+#                     self.bottomLeft.m = np.append(self.bottomLeft.m, self.m[coord])
+# 		        elif self.r[coord][0] >= self.bottomRight.xmin and self.r[coord][1] > self.bottomRight.ymin and self.r[coord][1] <= self.bottomRight.ymax and self.r[coord][0] < self.bottomRight.xmax:
+#                     self.bottomRight.n += 1
+#                     self.bottomRight.r = np.append(self.bottomRight.r, self.r[coord])
+#                     self.bottomRight.m = np.append(self.bottomRight.m, self.m[coord])
+            
+
+#             for mesh in [self.topLeft, self.topRight, self.bottomLeft, self.bottomRight]:
+#                 if mesh.n == 1:
+#                     mesh.isLeaf = True
+
+#         self.children = [self.topLeft, self.topRight, self.bottomLeft, self.bottomRight]
+
+#         def traverse(self):
+#             return self.params
+#             for child in self.children:
+#                 if child != None:
+#                     traverse(child)
+
+
+
+
+class GravitationalSystem(object):
+
+
+
+    def forces(self, N, r, m):
+        # root = Node(False, -50*N, -50*N, 50*N, 50*N, N, r, m)
+        # tree = [root.topLeft, root.topRight, root.bottomLeft, root.bottomRight]
+        # theta = 1
+
+        F_each = np.zeros((N, N, 2))
+        for i in range(N):
+            for j in range(i+1, N):
+                r_ij = r[i] - r[j]
+                r_magn = np.linalg.norm(r_ij)
+                F_each[i][j] = -G*m[i]*m[j]/(r_magn ** 3) * r_ij
+                # F_each[i][j] = (24/(r_magn ** 8) - 48/(r_magn ** 14)) * r_ij
+                F_each[j][i] = -F_each[i][j]
+        F = [sum(F_each[i]) for i in range(N)]
+        return F
+
+    def __init__(self, N: int, G: float, dt: float, m, r, v, acc: int):
+        self.acc = acc # accuracy of the numerical ODE solving method on a scale from 1 to 10
+        self.N = N # number of bodies
+        self.m = m # mass of every particle (kg)
+        self.dt = dt # finite time interval (s)
+        self.r = r # positions of every particle 
+        self.v = v # velocities of every particle
+        self.F = self.forces(self.N, self.r, self.m)
+        self.a = np.array([self.F[i] / self.m[i] if m[i] != 0 else [0, 0] for i in range(self.N)])
+        self.KE = 0.5 * sum([self.m[i] * (np.linalg.norm(self.v[i]) ** 2) for i in range(self.N)])
+        self.PE = 0
+        self.momentum = np.dot(self.m, self.v)
+        self.L = sum([np.cross(self.r[i], self.m[i] * self.v[i]) for i in range(self.N)])
+        self.r_cm = np.dot(self.m, self.r) / sum(self.m)
+        self.epsilon = 0.001
+
+        for i in range(self.N):
+            for j in range(self.N):
+                if j != i:
+                    r_ij = self.r[i] - self.r[j]
+                    r_magn = np.linalg.norm(r_ij)
+                    self.PE += G*self.m[i]*self.m[j]/(r_magn + self.epsilon)
+        
+        self.energy = self.KE + self.PE
+
+        self.params = [[self.energy, self.momentum, self.L, self.r_cm]]
+        self.pos = [self.r]
+        self.vel = [self.v]
+
+        self.t = self.dt
+
+
+    
+    
+    def calculate_system_state(self):
+        if self.t >= 0:
+            match self.acc:
+                case 1:
+                    v_next = self.v + self.a * self.dt
+                    r_next = self.r + v_next * self.dt
+                    self.r, self.v = r_next, v_next
+                case 2:
+                    v_mid = self.v + self.a * self.dt / 2
+                    v_next = self.v + self.a * self.dt
+                    r_next = self.r + v_mid * self.dt
+                    self.r, self.v = r_next, v_next
+                case 3:
+                    k1 = self.v
+                    k2 = self.v + self.a * self.dt / 2
+                    k3 = self.v + self.a * self.dt
+                    r_next = self.r + (k1 + 4 * k2 + k3) * self.dt / 6
+                    self.r, self.v = r_next, k3
+                # case 4:
+
+        
+            # step = int(self.t // self.dt)
+
+            self.pos.append(self.r)
+            self.vel.append(self.v)
+
+            self.F = self.forces(self.N, self.r, self.m)
+            self.a = np.array([self.F[i] / self.m[i] if m[i] != 0 else [0, 0] for i in range(self.N)])
+            self.KE = 0.5 * sum(self.m[i] * (np.linalg.norm(self.v[i]) ** 2) for i in range(self.N))
+            self.PE = 0
+            for i in range(self.N):
+                for j in range(self.N):
+                    if j != i:
+                        r_ij = self.r[i] - self.r[j]
+                        r_magn = np.linalg.norm(r_ij)
+                        self.PE += G*self.m[i]*self.m[j]/(r_magn + self.epsilon)
+            self.energy = self.KE + self.PE
+            self.momentum = np.dot(self.m, self.v)
+            self.L = sum([np.cross(self.r[i], self.m[i] * self.v[i]) for i in range(self.N)])
+            self.r_cm = np.dot(self.m, self.r) / sum(self.m)
+
+                # for i in range(self.N):
+                #     for j in range(self.N):
+                #         if j != i:
+                #             r_ij = self.r[i] - self.r[j]
+                #             r_magn = np.linalg.norm(r_ij)
+                #             self.a[i] += -G*self.m[j] / (r_magn ** 3) * r_ij
+                #             self.F[i] += self.m[i] * self.a[i]
+                #             self.PE += G*self.m[i]*self.m[j]/r_magn
+            
+            self.params.append([self.energy, self.momentum, self.L, self.r_cm])
+            self.t += self.dt
+
+        # return [self.r, self.v]
+
+
+    # def output(self):
+    #     print(f"{self.t}|{self.r}|{self.v}|{self.a}|{self.F}|{self.energy}|{self.momentum}|{self.L}|")
+
+    # def animate(self):
+        
+
+    
+if __name__ == '__main__':
+    N = 3
+    G = 1
+    steps = 1000
+    dt = 0.01
+
+    # Gradual mass distribution
+    m = np.array([100 for i in range(1, N + 1)])
+    # m = np.append(m, [100000000], axis=0)
+    sq = int(np.floor(np.sqrt(N)))
+    r = np.array([np.array([10 * j, 10 * i]) for j in range(sq) for i in range(sq)])
+    if N - sq != 0:
+        r = np.append(r, np.array([np.array([10 * sq, 10 * i]) for i in range(N - sq ** 2)]), axis=0)
+    print(sq, len(r), m)
+    # r = np.append(r, [[1000, 1000]], axis=0)
+    v = np.zeros((N, 2))
+    # v = np.append(v, [[0, 0]], axis=0)
+
+    # Galactical type mass distribution
+    # m = np.array([10 if i != 0 else 100 for i in range(N)])
+    # r = np.zeros((1, 2))
+    # v = np.zeros((1, 2))
+    # l = 10
+    # theta = np.pi / 4
+    # k = int(np.floor(0.5 + np.sqrt(0.25 + 8*theta/(np.pi * l) * (N-1))))
+    # radius = k * l
+    # Nr = N - 1
+    # print(k)
+    # for i in range(1, k + 1):
+    #     for j in range(1, int(np.floor(2*np.pi/theta * i)) + 1):
+    #         r = np.append(r, r - np.array([[i*l*np.cos(j/i*theta), i*l*np.cos(j/i*theta)]]), axis=0)
+    #         # if i != 1 and j != 1: 
+    #             # v = np.append(v, [[np.sqrt(G*m[0]/np.linalg.norm(r[-1]))*np.sin(j/i * theta), np.sqrt(G*m[0]/np.linalg.norm(r[-1]))*np.cos(j/i * theta)]], axis=0)
+    #         Nr -= 1
+    #         if j % 20 == 0:
+    #             print(r)
+    # while Nr != 0:
+    #     r = np.append(r, [[randint(r[0][0] - 2*radius, r[0][0] + 2*radius), randint(r[0][1] - 2*radius, r[0][1] + 2*radius)]], axis=0)
+        # v = np.append(v, [[np.sqrt(G*m[0]/np.linalg.norm(r[-1]))*np.sin(j/i * theta), np.sqrt(G*m[0]/np.linalg.norm(r[-1]))]]*np.cos(j/i * theta), axis=9)
+
+
+    acc = int(input("""Choose your numerical ODE solving method based on accuracy level:
+
+    1 - Euler
+    2 - Midpoint rule
+    3 - Runge-Kutta 3rd order
+    4 - Classic Runge-Kutta
+    5 - Dormand-Prince
+    6 - Gauss-Legendre
+    7, 8, 9, 10 - etc.
+    
+"""))
+    # print(m[9], r[9], v[9])
+
+    star_gas = GravitationalSystem(N, G, dt, m, r, v, acc)
+    for _ in range(steps):
+        star_gas.calculate_system_state()
+    # time = np.linspace(0, steps*dt, num=steps)
+    positions = np.array(star_gas.pos)
+    # velocities = np.array([star_gas.calculate_system_state()[1] for i in range(1, N+1)])
+    motion_integrals = star_gas.params
+    # initial = motion_integrals[0]
+
+    fig, ax = plt.subplots()
+
+    t1 = time.time()
+
+    def animate(frame):
+        ax.clear()
+        for i in range(N):
+            x, y = positions[frame-1][i][0], positions[frame-1][i][1]
+            # vx, vy = velocities[frame-1][i][0], velocities[frame-1][i][1]
+            x_next, y_next = positions[frame][i][0], positions[frame][i][1]
+            # if i < (N - 1):
+            circle = plt.Circle((x, y), 1)
+            # else:
+            #     circle = plt.Circle((x, y), 15, color='k')
+            ax.add_artist(circle)
+            plt.plot([x, x_next], [y, y_next])
+            # plt.arrow(x=x, y=y, dx=vx, dy=vy)
+            
+        t2 = time.time()
+        t = round(t2 - t1, 3)
+
+        ax.plot([], [], ' ', label=f't = {t}')
+        ax.plot([], [], ' ', label=f'Energy = {motion_integrals[frame-1][0]}')
+        ax.plot([], [], ' ', label=f'Momentum = {motion_integrals[frame-1][1]}')
+        ax.plot([], [], ' ', label=f'Angular momentum = {motion_integrals[frame-1][2]}')
+        ax.plot([], [], ' ', label=f'Centre of mass = {motion_integrals[frame-1][3]}')
+        ax.legend()
+
+        ax.set_xlim(-10*N, 10*N)
+        ax.set_ylim(-10*N, 10*N)
+
+        plt.grid()
+
+        plt.tight_layout()
+
+    animation = anim.FuncAnimation(fig, animate, frames=steps, interval=dt)
+
+    plt.show()
+    # path = r"/home/nick/Projects/Python/Learning/nick/modelling/black_hole.gif"
+    # writergif = anim.PillowWriter(fps=20)
+    # animation.save(path, writer=writergif)
+
+
+#     table = f"{' '*8}t{' '*8}|{' '*8}r{' '*8}|{' '*8}v{' '*8}|{' '*8}a{' '*8}|{' '*8}F{' '*8}|{' '*8}E{' '*8}|{' '*8}P{' '*8}|{' '*8}L{' '*8}|"
+#     print(f"""{table}
+# {'-'*len(table)}""")
+#     for i in range(0, steps+1, 100):
+#         print(f"\t{time[i]}\t|", end='')
+#         for param in data[i]:
+#             print(f"{param}|", end='')
+#         print(f"""delta_E = {abs(data[i][-3] - data[0][-3]) / data[0][-3] * 100}%
+# delta_P = {abs(np.linalg.norm(data[i][-2]) - np.linalg.norm(data[0][-2])) / np.linalg.norm(data[i][-2]) * 100}%
+# delta_L = {abs(data[i][-1] - data[0][-1]) / data[0][-1] * 100}%""")
